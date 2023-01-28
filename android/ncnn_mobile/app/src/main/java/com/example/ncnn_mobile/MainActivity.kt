@@ -1,14 +1,13 @@
 package com.example.ncnn_mobile
 
 import android.Manifest
-import android.content.ContentValues
+import android.R.attr
 import android.content.pm.PackageManager
 import android.graphics.*
-import android.media.Image
 import android.os.Build
 import android.os.Bundle
-import android.provider.MediaStore
 import android.util.Log
+import android.util.Size
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
@@ -17,18 +16,15 @@ import androidx.camera.video.*
 import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.core.content.PermissionChecker
 import com.example.ncnn_mobile.databinding.ActivityMainBinding
 import com.tencent.yolov5ncnn.YoloV5Ncnn
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
-import java.text.SimpleDateFormat
-import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 
-typealias LumaListener = (luma: Double) -> Unit
+typealias Yolov5NcnnListener = (objects: Array<YoloV5Ncnn.Obj>?, bitmap: Bitmap?) -> Unit
 
 
 class MainActivity : AppCompatActivity() {
@@ -41,25 +37,18 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var cameraExecutor: ExecutorService
 
-    private val yolov5ncnn = YoloV5Ncnn()
+    private var yolov5ncnn = YoloV5Ncnn()
 
-    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
-
-        private fun ByteBuffer.toByteArray(): ByteArray {
-            rewind()    // Rewind the buffer to zero
-            val data = ByteArray(remaining())
-            get(data)   // Copy the buffer into a byte array
-            return data // Return the byte array
-        }
-
+    private class Yolov5NcnnAnalyzer(private val yolov5ncnn: YoloV5Ncnn, private val listener: Yolov5NcnnListener) : ImageAnalysis.Analyzer {
         override fun analyze(image: ImageProxy) {
+            val bitmap = imageToBitmap(image, 0f)
+            Log.d(TAG, "${bitmap?.width}, ${bitmap?.height}")
+            var objects: Array<YoloV5Ncnn.Obj>? = yolov5ncnn.Detect(bitmap, true)
+            if (objects == null) {
+                objects = yolov5ncnn.Detect(bitmap, false)
+            }
 
-            val buffer = image.planes[0].buffer
-            val data = buffer.toByteArray()
-            val pixels = data.map { it.toInt() and 0xFF }
-            val luma = pixels.average()
-
-            listener(luma)
+            listener(objects, bitmap)
 
             image.close()
         }
@@ -88,16 +77,17 @@ class MainActivity : AppCompatActivity() {
         // Image → JPEGのバイト配列
         private fun imageToByteArray(image: ImageProxy): ByteArray? {
             var data: ByteArray? = null
-            if (image.getFormat() === ImageFormat.JPEG) {
-                val planes: Array<out ImageProxy.PlaneProxy> = image.getPlanes()
-                val buffer: ByteBuffer = planes[0].getBuffer()
+            Log.i(TAG, "image.format: ${image.format}")
+            if (image.format === ImageFormat.JPEG) {
+                val planes: Array<out ImageProxy.PlaneProxy> = image.planes
+                val buffer: ByteBuffer = planes[0].buffer
                 data = ByteArray(buffer.capacity())
                 buffer[data]
                 return data
-            } else if (image.getFormat() === ImageFormat.YUV_420_888) {
+            } else if (image.format === ImageFormat.YUV_420_888) {
                 data = NV21toJPEG(
                     YUV_420_888toNV21(image),
-                    image.getWidth(), image.getHeight()
+                    image.width, image.height
                 )
             }
             return data
@@ -106,9 +96,9 @@ class MainActivity : AppCompatActivity() {
         // YUV_420_888 → NV21
         private fun YUV_420_888toNV21(image: ImageProxy): ByteArray {
             val nv21: ByteArray
-            val yBuffer: ByteBuffer = image.getPlanes().get(0).getBuffer()
-            val uBuffer: ByteBuffer = image.getPlanes().get(1).getBuffer()
-            val vBuffer: ByteBuffer = image.getPlanes().get(2).getBuffer()
+            val yBuffer: ByteBuffer = image.planes.get(0).buffer
+            val uBuffer: ByteBuffer = image.planes.get(1).buffer
+            val vBuffer: ByteBuffer = image.planes.get(2).buffer
             val ySize = yBuffer.remaining()
             val uSize = uBuffer.remaining()
             val vSize = vBuffer.remaining()
@@ -133,10 +123,7 @@ class MainActivity : AppCompatActivity() {
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
 
-        val ret = yolov5ncnn.Init(assets)
-        if (!ret) {
-            Log.e(TAG, "yolov5ncnn Init failed")
-        }
+        yolov5ncnn.Init(assets)
 
         // Request camera permissions
         if (allPermissionsGranted()) {
@@ -145,10 +132,6 @@ class MainActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(
                 this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         }
-
-        // Set up the listeners for take photo and video capture buttons
-        viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
-        viewBinding.videoCaptureButton.setOnClickListener { captureVideo() }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
     }
@@ -168,117 +151,6 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun takePhoto() {
-        // Get a stable reference of the modifiable image capture use case
-        val imageCapture = imageCapture ?: return
-
-        // Create time stamped name and MediaStore entry.
-        val name = SimpleDateFormat(FILENAME_FORMAT, Locale.US)
-            .format(System.currentTimeMillis())
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            if(Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-                put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/CameraX-Image")
-            }
-        }
-
-        // Create output options object which contains file + metadata
-        val outputOptions = ImageCapture.OutputFileOptions
-            .Builder(contentResolver,
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues)
-            .build()
-
-        // Set up image capture listener, which is triggered after photo has
-        // been taken
-        imageCapture.takePicture(
-            outputOptions,
-            ContextCompat.getMainExecutor(this),
-            object : ImageCapture.OnImageSavedCallback {
-                override fun onError(exc: ImageCaptureException) {
-                    Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
-                }
-
-                override fun
-                        onImageSaved(output: ImageCapture.OutputFileResults){
-                    val msg = "Photo capture succeeded: ${output.savedUri}"
-                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
-                    Log.d(TAG, msg)
-                }
-            }
-        )
-    }
-
-    // Implements VideoCapture use case, including start and stop capturing.
-    private fun captureVideo() {
-        val videoCapture = this.videoCapture ?: return
-
-        viewBinding.videoCaptureButton.isEnabled = false
-
-        val curRecording = recording
-        if (curRecording != null) {
-            // Stop the current recording session.
-            curRecording.stop()
-            recording = null
-            return
-        }
-
-        // create and start a new recording session
-        val name = SimpleDateFormat(FILENAME_FORMAT, Locale.US)
-            .format(System.currentTimeMillis())
-        val contentValues = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-            put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-            if (Build.VERSION.SDK_INT > Build.VERSION_CODES.P) {
-                put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/CameraX-Video")
-            }
-        }
-
-        val mediaStoreOutputOptions = MediaStoreOutputOptions
-            .Builder(contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
-            .setContentValues(contentValues)
-            .build()
-        recording = videoCapture.output
-            .prepareRecording(this, mediaStoreOutputOptions)
-            .apply {
-                if (PermissionChecker.checkSelfPermission(this@MainActivity,
-                        Manifest.permission.RECORD_AUDIO) ==
-                    PermissionChecker.PERMISSION_GRANTED)
-                {
-                    withAudioEnabled()
-                }
-            }
-            .start(ContextCompat.getMainExecutor(this)) { recordEvent ->
-                when(recordEvent) {
-                    is VideoRecordEvent.Start -> {
-                        viewBinding.videoCaptureButton.apply {
-                            text = getString(R.string.stop_capture)
-                            isEnabled = true
-                        }
-                    }
-                    is VideoRecordEvent.Finalize -> {
-                        if (!recordEvent.hasError()) {
-                            val msg = "Video capture succeeded: " +
-                                    "${recordEvent.outputResults.outputUri}"
-                            Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT)
-                                .show()
-                            Log.d(TAG, msg)
-                        } else {
-                            recording?.close()
-                            recording = null
-                            Log.e(TAG, "Video capture ends with error: " +
-                                    "${recordEvent.error}")
-                        }
-                        viewBinding.videoCaptureButton.apply {
-                            text = getString(R.string.start_capture)
-                            isEnabled = true
-                        }
-                    }
-                }
-            }
-    }
-
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
@@ -294,10 +166,14 @@ class MainActivity : AppCompatActivity() {
                 }
             imageCapture = ImageCapture.Builder().build()
             val imageAnalyzer = ImageAnalysis.Builder()
+                .setTargetResolution(Size(640, 640))
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, LuminosityAnalyzer { luma ->
-                        Log.d(TAG, "Average luminosity: $luma")
+                    it.setAnalyzer(cameraExecutor, Yolov5NcnnAnalyzer(yolov5ncnn) { objects: Array<YoloV5Ncnn.Obj>?, bitmap: Bitmap? ->
+                        showObjects(
+                            objects,
+                            bitmap
+                        )
                     })
                 }
             // Select back camera as a default
@@ -316,6 +192,76 @@ class MainActivity : AppCompatActivity() {
             }
 
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    private fun showObjects(objects: Array<YoloV5Ncnn.Obj>?, bitmap: Bitmap?) {
+        if (objects == null || bitmap == null) {
+            //viewBinding.imageView.setImageBitmap(bitmap)
+            return
+        }
+
+        // draw objects on bitmap
+        val rgba: Bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
+        val colors = intArrayOf(
+            Color.rgb(54, 67, 244),
+            Color.rgb(99, 30, 233),
+            Color.rgb(176, 39, 156),
+            Color.rgb(183, 58, 103),
+            Color.rgb(181, 81, 63),
+            Color.rgb(243, 150, 33),
+            Color.rgb(244, 169, 3),
+            Color.rgb(212, 188, 0),
+            Color.rgb(136, 150, 0),
+            Color.rgb(80, 175, 76),
+            Color.rgb(74, 195, 139),
+            Color.rgb(57, 220, 205),
+            Color.rgb(59, 235, 255),
+            Color.rgb(7, 193, 255),
+            Color.rgb(0, 152, 255),
+            Color.rgb(34, 87, 255),
+            Color.rgb(72, 85, 121),
+            Color.rgb(158, 158, 158),
+            Color.rgb(139, 125, 96)
+        )
+        val canvas = Canvas(rgba)
+        val paint = Paint()
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 4f
+        val textbgpaint = Paint()
+        textbgpaint.color = Color.WHITE
+        textbgpaint.style = Paint.Style.FILL
+        val textpaint = Paint()
+        textpaint.color = Color.BLACK
+        textpaint.textSize = 26f
+        textpaint.textAlign = Paint.Align.LEFT
+        for (i in objects.indices) {
+            paint.color = colors[i % 19]
+            canvas.drawRect(
+                objects[i].x,
+                objects[i].y,
+                objects[i].x + objects[i].w,
+                objects[i].y + objects[i].h,
+                paint
+            )
+
+            // draw filled text inside image
+            run {
+                val text = objects[i].label + " = " + String.format(
+                    "%.1f",
+                    objects[i].prob * 100
+                ) + "%"
+                val text_width = textpaint.measureText(text)
+                val text_height = -textpaint.ascent() + textpaint.descent()
+                var x = objects[i].x
+                var y = objects[i].y - text_height
+                if (y < 0) y = 0f
+                if (x + text_width > rgba.width) x = rgba.width - text_width
+                canvas.drawRect(x, y, x + text_width, y + text_height, textbgpaint)
+                canvas.drawText(text, x, y - textpaint.ascent(), textpaint)
+            }
+        }
+        runOnUiThread { viewBinding.imageView.setImageBitmap(rgba) }
+        //viewBinding.imageView.setImageBitmap(rgba)
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
