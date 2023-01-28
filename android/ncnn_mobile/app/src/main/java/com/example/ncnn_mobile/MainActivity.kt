@@ -3,36 +3,30 @@ package com.example.ncnn_mobile
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.graphics.*
+import android.media.Image
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.ImageCapture
-import androidx.camera.video.Recorder
-import androidx.camera.video.Recording
+import androidx.camera.core.*
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.video.*
 import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.ncnn_mobile.databinding.ActivityMainBinding
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import android.widget.Toast
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.core.Preview
-import androidx.camera.core.CameraSelector
-import android.util.Log
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.ImageProxy
-import androidx.camera.video.FallbackStrategy
-import androidx.camera.video.MediaStoreOutputOptions
-import androidx.camera.video.Quality
-import androidx.camera.video.QualitySelector
-import androidx.camera.video.VideoRecordEvent
 import androidx.core.content.PermissionChecker
+import com.example.ncnn_mobile.databinding.ActivityMainBinding
+import com.tencent.yolov5ncnn.YoloV5Ncnn
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
-import java.util.Locale
+import java.util.*
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+
 
 typealias LumaListener = (luma: Double) -> Unit
 
@@ -46,6 +40,8 @@ class MainActivity : AppCompatActivity() {
     private var recording: Recording? = null
 
     private lateinit var cameraExecutor: ExecutorService
+
+    private val yolov5ncnn = YoloV5Ncnn()
 
     private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
 
@@ -67,12 +63,80 @@ class MainActivity : AppCompatActivity() {
 
             image.close()
         }
+
+        // ImageProxy → Bitmap
+        private fun imageToBitmap(image: ImageProxy, rotationDegrees: Float): Bitmap? {
+            val data = imageToByteArray(image)
+            val bitmap = BitmapFactory.decodeByteArray(data, 0, data!!.size)
+            return if (rotationDegrees == 0.0f) {
+                bitmap
+            } else {
+                rotateBitmap(bitmap, rotationDegrees)
+            }
+        }
+
+        // Bitmapの回転
+        private fun rotateBitmap(bitmap: Bitmap, rotationDegrees: Float): Bitmap? {
+            val mat = Matrix()
+            mat.postRotate(rotationDegrees)
+            return Bitmap.createBitmap(
+                bitmap, 0, 0,
+                bitmap.width, bitmap.height, mat, true
+            )
+        }
+
+        // Image → JPEGのバイト配列
+        private fun imageToByteArray(image: ImageProxy): ByteArray? {
+            var data: ByteArray? = null
+            if (image.getFormat() === ImageFormat.JPEG) {
+                val planes: Array<out ImageProxy.PlaneProxy> = image.getPlanes()
+                val buffer: ByteBuffer = planes[0].getBuffer()
+                data = ByteArray(buffer.capacity())
+                buffer[data]
+                return data
+            } else if (image.getFormat() === ImageFormat.YUV_420_888) {
+                data = NV21toJPEG(
+                    YUV_420_888toNV21(image),
+                    image.getWidth(), image.getHeight()
+                )
+            }
+            return data
+        }
+
+        // YUV_420_888 → NV21
+        private fun YUV_420_888toNV21(image: ImageProxy): ByteArray {
+            val nv21: ByteArray
+            val yBuffer: ByteBuffer = image.getPlanes().get(0).getBuffer()
+            val uBuffer: ByteBuffer = image.getPlanes().get(1).getBuffer()
+            val vBuffer: ByteBuffer = image.getPlanes().get(2).getBuffer()
+            val ySize = yBuffer.remaining()
+            val uSize = uBuffer.remaining()
+            val vSize = vBuffer.remaining()
+            nv21 = ByteArray(ySize + uSize + vSize)
+            yBuffer[nv21, 0, ySize]
+            vBuffer[nv21, ySize, vSize]
+            uBuffer[nv21, ySize + vSize, uSize]
+            return nv21
+        }
+
+        // NV21 → JPEG
+        private fun NV21toJPEG(nv21: ByteArray, width: Int, height: Int): ByteArray? {
+            val out = ByteArrayOutputStream()
+            val yuv = YuvImage(nv21, ImageFormat.NV21, width, height, null)
+            yuv.compressToJpeg(Rect(0, 0, width, height), 100, out)
+            return out.toByteArray()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
+
+        val ret = yolov5ncnn.Init(assets)
+        if (!ret) {
+            Log.e(TAG, "yolov5ncnn Init failed")
+        }
 
         // Request camera permissions
         if (allPermissionsGranted()) {
