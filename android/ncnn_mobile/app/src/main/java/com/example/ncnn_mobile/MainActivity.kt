@@ -1,48 +1,47 @@
 package com.example.ncnn_mobile
 
 import android.Manifest
-import android.R.attr
 import android.content.pm.PackageManager
-import android.graphics.*
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import android.util.Size
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.*
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.video.*
-import androidx.camera.video.VideoCapture
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.ncnn_mobile.databinding.ActivityMainBinding
 import com.tencent.yolov5ncnn.YoloV5Ncnn
-import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-
 typealias Yolov5NcnnListener = (objects: Array<YoloV5Ncnn.Obj>?, bitmap: Bitmap?) -> Unit
-
 
 class MainActivity : AppCompatActivity() {
     private lateinit var viewBinding: ActivityMainBinding
-
-    private var imageCapture: ImageCapture? = null
-
-    private var videoCapture: VideoCapture<Recorder>? = null
-    private var recording: Recording? = null
-
     private lateinit var cameraExecutor: ExecutorService
-
     private var yolov5ncnn = YoloV5Ncnn()
 
-    private class Yolov5NcnnAnalyzer(private val yolov5ncnn: YoloV5Ncnn, private val listener: Yolov5NcnnListener) : ImageAnalysis.Analyzer {
+    private class Yolov5NcnnAnalyzer(
+        private val yolov5ncnn: YoloV5Ncnn,
+        private val listener: Yolov5NcnnListener
+    ) : ImageAnalysis.Analyzer {
         override fun analyze(image: ImageProxy) {
-            val bitmap = imageToBitmap(image, 0f)
-            Log.d(TAG, "${bitmap?.width}, ${bitmap?.height}")
+            val planes = image.planes
+            val buffer: ByteBuffer = planes[0].buffer
+            val pixelStride: Int = planes[0].pixelStride
+            val bitmap = Bitmap.createBitmap(
+                image.width, image.height, Bitmap.Config.ARGB_8888
+            )
+            bitmap.copyPixelsFromBuffer(buffer)
             var objects: Array<YoloV5Ncnn.Obj>? = yolov5ncnn.Detect(bitmap, true)
             if (objects == null) {
                 objects = yolov5ncnn.Detect(bitmap, false)
@@ -52,70 +51,6 @@ class MainActivity : AppCompatActivity() {
 
             image.close()
         }
-
-        // ImageProxy → Bitmap
-        private fun imageToBitmap(image: ImageProxy, rotationDegrees: Float): Bitmap? {
-            val data = imageToByteArray(image)
-            val bitmap = BitmapFactory.decodeByteArray(data, 0, data!!.size)
-            return if (rotationDegrees == 0.0f) {
-                bitmap
-            } else {
-                rotateBitmap(bitmap, rotationDegrees)
-            }
-        }
-
-        // Bitmapの回転
-        private fun rotateBitmap(bitmap: Bitmap, rotationDegrees: Float): Bitmap? {
-            val mat = Matrix()
-            mat.postRotate(rotationDegrees)
-            return Bitmap.createBitmap(
-                bitmap, 0, 0,
-                bitmap.width, bitmap.height, mat, true
-            )
-        }
-
-        // Image → JPEGのバイト配列
-        private fun imageToByteArray(image: ImageProxy): ByteArray? {
-            var data: ByteArray? = null
-            Log.i(TAG, "image.format: ${image.format}")
-            if (image.format === ImageFormat.JPEG) {
-                val planes: Array<out ImageProxy.PlaneProxy> = image.planes
-                val buffer: ByteBuffer = planes[0].buffer
-                data = ByteArray(buffer.capacity())
-                buffer[data]
-                return data
-            } else if (image.format === ImageFormat.YUV_420_888) {
-                data = NV21toJPEG(
-                    YUV_420_888toNV21(image),
-                    image.width, image.height
-                )
-            }
-            return data
-        }
-
-        // YUV_420_888 → NV21
-        private fun YUV_420_888toNV21(image: ImageProxy): ByteArray {
-            val nv21: ByteArray
-            val yBuffer: ByteBuffer = image.planes.get(0).buffer
-            val uBuffer: ByteBuffer = image.planes.get(1).buffer
-            val vBuffer: ByteBuffer = image.planes.get(2).buffer
-            val ySize = yBuffer.remaining()
-            val uSize = uBuffer.remaining()
-            val vSize = vBuffer.remaining()
-            nv21 = ByteArray(ySize + uSize + vSize)
-            yBuffer[nv21, 0, ySize]
-            vBuffer[nv21, ySize, vSize]
-            uBuffer[nv21, ySize + vSize, uSize]
-            return nv21
-        }
-
-        // NV21 → JPEG
-        private fun NV21toJPEG(nv21: ByteArray, width: Int, height: Int): ByteArray? {
-            val out = ByteArrayOutputStream()
-            val yuv = YuvImage(nv21, ImageFormat.NV21, width, height, null)
-            yuv.compressToJpeg(Rect(0, 0, width, height), 100, out)
-            return out.toByteArray()
-        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -124,28 +59,30 @@ class MainActivity : AppCompatActivity() {
         setContentView(viewBinding.root)
 
         yolov5ncnn.Init(assets)
-
         // Request camera permissions
         if (allPermissionsGranted()) {
             startCamera()
         } else {
             ActivityCompat.requestPermissions(
-                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
+                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
+            )
         }
-
         cameraExecutor = Executors.newSingleThreadExecutor()
     }
 
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<String>, grantResults:
-        IntArray) {
+        IntArray
+    ) {
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (allPermissionsGranted()) {
                 startCamera()
             } else {
-                Toast.makeText(this,
+                Toast.makeText(
+                    this,
                     "Permissions not granted by the user.",
-                    Toast.LENGTH_SHORT).show()
+                    Toast.LENGTH_SHORT
+                ).show()
                 finish()
             }
         }
@@ -153,28 +90,34 @@ class MainActivity : AppCompatActivity() {
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        var frameCounter = 0
+        var lastFpsTimestamp = System.currentTimeMillis()
 
         cameraProviderFuture.addListener({
             // Used to bind the lifecycle of cameras to the lifecycle owner
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
-
-            // Preview
-            val preview = Preview.Builder()
-                .build()
-                .also {
-                    it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
-                }
-            imageCapture = ImageCapture.Builder().build()
             val imageAnalyzer = ImageAnalysis.Builder()
-                .setTargetResolution(Size(640, 640))
+                .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build()
                 .also {
-                    it.setAnalyzer(cameraExecutor, Yolov5NcnnAnalyzer(yolov5ncnn) { objects: Array<YoloV5Ncnn.Obj>?, bitmap: Bitmap? ->
-                        showObjects(
-                            objects,
-                            bitmap
-                        )
-                    })
+                    it.setAnalyzer(
+                        cameraExecutor,
+                        Yolov5NcnnAnalyzer(yolov5ncnn) { objects: Array<YoloV5Ncnn.Obj>?, bitmap: Bitmap? ->
+                            showObjects(
+                                objects,
+                                bitmap
+                            )
+                            val frameCount = 10
+                            if (++frameCounter % frameCount == 0) {
+                                frameCounter = 0
+                                val now = System.currentTimeMillis()
+                                val delta = now - lastFpsTimestamp
+                                val fps = 1000 * frameCount.toFloat() / delta
+                                Log.d(TAG, "FPS: ${"%.02f".format(fps)}")
+                                lastFpsTimestamp = now
+                            }
+                        })
                 }
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -182,15 +125,11 @@ class MainActivity : AppCompatActivity() {
             try {
                 // Unbind use cases before rebinding
                 cameraProvider.unbindAll()
-
                 // Bind use cases to camera
-                cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageCapture, imageAnalyzer)
-
-            } catch(exc: Exception) {
+                cameraProvider.bindToLifecycle(this, cameraSelector, imageAnalyzer)
+            } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
-
         }, ContextCompat.getMainExecutor(this))
     }
 
@@ -199,7 +138,6 @@ class MainActivity : AppCompatActivity() {
             //viewBinding.imageView.setImageBitmap(bitmap)
             return
         }
-
         // draw objects on bitmap
         val rgba: Bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true)
         val colors = intArrayOf(
@@ -224,17 +162,20 @@ class MainActivity : AppCompatActivity() {
             Color.rgb(139, 125, 96)
         )
         val canvas = Canvas(rgba)
-        val paint = Paint()
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = 4f
-        val textbgpaint = Paint()
-        textbgpaint.color = Color.WHITE
-        textbgpaint.style = Paint.Style.FILL
-        val textpaint = Paint()
-        textpaint.color = Color.BLACK
-        textpaint.textSize = 26f
-        textpaint.textAlign = Paint.Align.LEFT
-        for (i in objects.indices) {
+        val paint = Paint().apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 4f
+        }
+        val textbgpaint = Paint().apply {
+            color = Color.WHITE
+            style = Paint.Style.FILL
+        }
+        val textpaint = Paint().apply {
+            color = Color.BLACK
+            textSize = 26f
+            textAlign = Paint.Align.LEFT
+        }
+        objects.indices.forEach { i ->
             paint.color = colors[i % 19]
             canvas.drawRect(
                 objects[i].x,
@@ -243,7 +184,6 @@ class MainActivity : AppCompatActivity() {
                 objects[i].y + objects[i].h,
                 paint
             )
-
             // draw filled text inside image
             run {
                 val text = objects[i].label + " = " + String.format(
@@ -261,12 +201,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
         runOnUiThread { viewBinding.imageView.setImageBitmap(rgba) }
-        //viewBinding.imageView.setImageBitmap(rgba)
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
         ContextCompat.checkSelfPermission(
-            baseContext, it) == PackageManager.PERMISSION_GRANTED
+            baseContext, it
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     override fun onDestroy() {
@@ -279,7 +219,7 @@ class MainActivity : AppCompatActivity() {
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
         private const val REQUEST_CODE_PERMISSIONS = 10
         private val REQUIRED_PERMISSIONS =
-            mutableListOf (
+            mutableListOf(
                 Manifest.permission.CAMERA,
                 Manifest.permission.RECORD_AUDIO
             ).apply {
