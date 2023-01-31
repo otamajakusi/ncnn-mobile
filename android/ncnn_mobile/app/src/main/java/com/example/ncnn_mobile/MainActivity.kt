@@ -2,10 +2,7 @@ package com.example.ncnn_mobile
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.Color
-import android.graphics.Paint
+import android.graphics.*
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
@@ -38,10 +35,15 @@ class MainActivity : AppCompatActivity() {
             val planes = image.planes
             val buffer: ByteBuffer = planes[0].buffer
             val pixelStride: Int = planes[0].pixelStride
-            val bitmap = Bitmap.createBitmap(
+            var bitmap = Bitmap.createBitmap(
                 image.width, image.height, Bitmap.Config.ARGB_8888
             )
             bitmap.copyPixelsFromBuffer(buffer)
+            val mat = Matrix()
+            mat.postRotate(image.imageInfo.rotationDegrees.toFloat())
+            bitmap = Bitmap.createBitmap(
+                bitmap, 0, 0, bitmap.width, bitmap.height, mat, false
+            )
             var objects: Array<YoloV5Ncnn.Obj>? = yolov5ncnn.Detect(bitmap, true)
             if (objects == null) {
                 objects = yolov5ncnn.Detect(bitmap, false)
