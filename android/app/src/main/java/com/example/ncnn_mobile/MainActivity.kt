@@ -35,19 +35,18 @@ class MainActivity : AppCompatActivity() {
             val planes = image.planes
             val buffer: ByteBuffer = planes[0].buffer
             val pixelStride: Int = planes[0].pixelStride
-            var bitmap = Bitmap.createBitmap(
-                image.width, image.height, Bitmap.Config.ARGB_8888
-            )
-            bitmap.copyPixelsFromBuffer(buffer)
-            val mat = Matrix()
-            mat.postRotate(image.imageInfo.rotationDegrees.toFloat())
-            bitmap = Bitmap.createBitmap(
-                bitmap, 0, 0, bitmap.width, bitmap.height, mat, false
-            )
-            var objects: Array<YoloV5Ncnn.Obj>? = yolov5ncnn.Detect(bitmap, true)
-            if (objects == null) {
-                objects = yolov5ncnn.Detect(bitmap, false)
+            val mat = Matrix().apply {
+                postRotate(image.imageInfo.rotationDegrees.toFloat())
             }
+            val bitmap = Bitmap.createBitmap(
+                image.width, image.height, Bitmap.Config.ARGB_8888
+            ).apply {
+                copyPixelsFromBuffer(buffer)
+            }.let {
+                Bitmap.createBitmap(it, 0, 0, it.width, it.height, mat, false)
+            }
+            val objects: Array<YoloV5Ncnn.Obj>? =
+                yolov5ncnn.Detect(bitmap, true) ?: yolov5ncnn.Detect(bitmap, false)
 
             listener(objects, bitmap)
 
