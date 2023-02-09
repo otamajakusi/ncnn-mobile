@@ -34,7 +34,6 @@ class MainActivity : AppCompatActivity() {
         override fun analyze(image: ImageProxy) {
             val planes = image.planes
             val buffer: ByteBuffer = planes[0].buffer
-            val pixelStride: Int = planes[0].pixelStride
             val mat = Matrix().apply {
                 postRotate(image.imageInfo.rotationDegrees.toFloat())
             }
@@ -91,8 +90,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun startCamera() {
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
-        var frameCounter = 0
-        var lastFpsTimestamp = System.currentTimeMillis()
 
         cameraProviderFuture.addListener({
             // Used to bind the lifecycle of cameras to the lifecycle owner
@@ -101,23 +98,11 @@ class MainActivity : AppCompatActivity() {
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
                 .build()
-                .also {
-                    it.setAnalyzer(
+                .apply {
+                    setAnalyzer(
                         cameraExecutor,
                         Yolov5NcnnAnalyzer(yolov5ncnn) { objects: Array<YoloV5Ncnn.Obj>?, bitmap: Bitmap? ->
-                            showObjects(
-                                objects,
-                                bitmap
-                            )
-                            val frameCount = 10
-                            if (++frameCounter % frameCount == 0) {
-                                frameCounter = 0
-                                val now = System.currentTimeMillis()
-                                val delta = now - lastFpsTimestamp
-                                val fps = 1000 * frameCount.toFloat() / delta
-                                Log.d(TAG, "FPS: ${"%.02f".format(fps)}")
-                                lastFpsTimestamp = now
-                            }
+                            showObjects(objects, bitmap)
                         })
                 }
             // Select back camera as a default
