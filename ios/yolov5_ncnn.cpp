@@ -1,12 +1,15 @@
-#include "layer.h"
-#include "net.h"
-
 #include "yolov5_ncnn.h"
 
 #include <stdio.h>
-#include <vector>
-#include <cfloat>
 
+#include <cfloat>
+#include <vector>
+
+#include "layer.h"
+#include "net.h"
+
+static ncnn::UnlockedPoolAllocator g_blob_pool_allocator;
+static ncnn::PoolAllocator g_workspace_pool_allocator;
 ncnn::Net yolov5;
 
 const int target_size = 640;
@@ -81,6 +84,8 @@ class YoloV5Focus : public ncnn::Layer {
     return 0;
   }
 };
+
+DEFINE_LAYER_CREATOR(YoloV5Focus)
 
 static inline float intersection_area(const Object& a, const Object& b) {
   if (a.x > b.x + b.w || a.x + a.w < b.x || a.y > b.y + b.h ||
@@ -252,8 +257,39 @@ static void generate_proposals(const ncnn::Mat& anchors, int stride,
 
 static Object* g_objects = NULL;
 
+bool yolov5NcnnInit(const char* param, const char* bin) {
+  ncnn::Option opt;
+  opt.lightmode = true;
+  opt.num_threads = 4;
+  opt.blob_allocator = &g_blob_pool_allocator;
+  opt.workspace_allocator = &g_workspace_pool_allocator;
+  opt.use_packing_layout = true;
+
+  // use vulkan compute
+  if (ncnn::get_gpu_count() != 0) opt.use_vulkan_compute = true;
+
+  yolov5.opt = opt;
+  yolov5.register_custom_layer("YoloV5Focus", YoloV5Focus_layer_creator);
+  int ret;
+  // init param
+  ret = yolov5.load_param(param);
+  if (ret != 0) {
+    return false;
+  }
+
+  // init bin
+  ret = yolov5.load_model(bin);
+  if (ret != 0) {
+    return false;
+  }
+  return true;
+}
+
 Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width, uint32_t height,
                          bool use_gpu) {
+  if (use_gpu == true && ncnn::get_gpu_count() == 0) {
+    return NULL;
+  }
   int img_w = width;
   int img_h = height;
 
@@ -271,8 +307,8 @@ Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width, uint32_t height,
     w = w * scale;
   }
 
-  ncnn::Mat in = ncnn::Mat::from_pixels_resize(
-      pixel, ncnn::Mat::PIXEL_BGR2RGB, img_w, img_h, w, h);
+  ncnn::Mat in = ncnn::Mat::from_pixels_resize(pixel, ncnn::Mat::PIXEL_BGRA2RGB,
+                                               img_w, img_h, w, h);
 
   // pad to target_size rectangle
   // yolov5/utils/datasets.py letterbox
@@ -287,6 +323,7 @@ Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width, uint32_t height,
 
   ncnn::Extractor ex = yolov5.create_extractor();
 
+  ex.set_vulkan_compute(use_gpu);
   ex.input("images", in_pad);
 
   std::vector<Object> proposals;
@@ -358,6 +395,9 @@ Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width, uint32_t height,
   nms_sorted_bboxes(proposals, picked, nms_threshold);
 
   int count = picked.size();
+  if (count == 0) {
+    return NULL;
+  }
 
   if (g_objects) {
     free(g_objects);
@@ -383,6 +423,7 @@ Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width, uint32_t height,
     objects[i].y = y0;
     objects[i].w = x1 - x0;
     objects[i].h = y1 - y0;
+    objects[i].last = i == count - 1;
   }
 
   return objects;

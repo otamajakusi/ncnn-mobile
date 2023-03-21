@@ -20,6 +20,8 @@
 		3CD8E63329C97F1000EB3EB6 /* openmp.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 3CD8E63229C97F0F00EB3EB6 /* openmp.framework */; };
 		3CD8E63429C97F1000EB3EB6 /* openmp.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 3CD8E63229C97F0F00EB3EB6 /* openmp.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		3CD8E63829C9845000EB3EB6 /* yolov5_ncnn.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CD8E63629C9844F00EB3EB6 /* yolov5_ncnn.cpp */; };
+		3CD8E63B29C9EC6A00EB3EB6 /* yolov5s.param in Resources */ = {isa = PBXBuildFile; fileRef = 3CD8E63929C9EC6900EB3EB6 /* yolov5s.param */; };
+		3CD8E63C29C9EC6A00EB3EB6 /* yolov5s.bin in Resources */ = {isa = PBXBuildFile; fileRef = 3CD8E63A29C9EC6A00EB3EB6 /* yolov5s.bin */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -53,6 +55,8 @@
 		3CD8E63529C9844E00EB3EB6 /* ios-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "ios-Bridging-Header.h"; sourceTree = "<group>"; };
 		3CD8E63629C9844F00EB3EB6 /* yolov5_ncnn.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = yolov5_ncnn.cpp; sourceTree = "<group>"; };
 		3CD8E63729C9845000EB3EB6 /* yolov5_ncnn.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = yolov5_ncnn.h; sourceTree = "<group>"; };
+		3CD8E63929C9EC6900EB3EB6 /* yolov5s.param */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = yolov5s.param; path = ../android/app/src/main/assets/yolov5s.param; sourceTree = "<group>"; };
+		3CD8E63A29C9EC6A00EB3EB6 /* yolov5s.bin */ = {isa = PBXFileReference; lastKnownFileType = archive.macbinary; name = yolov5s.bin; path = ../android/app/src/main/assets/yolov5s.bin; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -72,6 +76,8 @@
 		3CD8E60729C97D5600EB3EB6 = {
 			isa = PBXGroup;
 			children = (
+				3CD8E63A29C9EC6A00EB3EB6 /* yolov5s.bin */,
+				3CD8E63929C9EC6900EB3EB6 /* yolov5s.param */,
 				3CD8E63629C9844F00EB3EB6 /* yolov5_ncnn.cpp */,
 				3CD8E63729C9845000EB3EB6 /* yolov5_ncnn.h */,
 				3CD8E61229C97D5600EB3EB6 /* ios */,
@@ -174,8 +180,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				3CD8E62029C97D5800EB3EB6 /* LaunchScreen.storyboard in Resources */,
+				3CD8E63B29C9EC6A00EB3EB6 /* yolov5s.param in Resources */,
 				3CD8E61D29C97D5800EB3EB6 /* Assets.xcassets in Resources */,
 				3CD8E61B29C97D5600EB3EB6 /* Main.storyboard in Resources */,
+				3CD8E63C29C9EC6A00EB3EB6 /* yolov5s.bin in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

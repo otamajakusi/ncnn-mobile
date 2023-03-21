@@ -14,8 +14,10 @@ typedef struct {
   float h;
   int label;
   float prob;
+  bool last;
 } Object;
 
+bool yolov5NcnnInit(const char* param, const char* bin);
 Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width, uint32_t height,
                          bool use_gpu);
 
