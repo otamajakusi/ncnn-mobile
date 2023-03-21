@@ -346,6 +346,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = ncnn.framework/Headers/ncnn;
 				INFOPLIST_FILE = ios/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "To be able to take video stream.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -386,6 +387,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = ncnn.framework/Headers/ncnn;
 				INFOPLIST_FILE = ios/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "To be able to take video stream.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
