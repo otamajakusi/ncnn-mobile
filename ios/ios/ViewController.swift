@@ -70,12 +70,68 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
         let ciImage = CIImage(cvPixelBuffer: pixelBuffe)
         let context = CIContext()
         guard let cgImage = context.createCGImage(ciImage, from: ciImage.extent) else { return }
-        let image = UIImage(cgImage: cgImage)
+        var image = UIImage(cgImage: cgImage)
         let rawData = getByteArrayFromImage(img: image)
-        let objects: UnsafeMutablePointer<Object>? = yolov5NcnnDetect(
+        let objects: UnsafePointer<Yolov5NcnnObject>? = yolov5NcnnDetect(
             rawData, UInt32(image.size.width), UInt32(image.size.height), true)
-        if (objects != nil) {
-            print(objects![0])
+        if objects != nil {
+
+            // Begin an image context with the size of the image
+            UIGraphicsBeginImageContext(image.size)
+
+            // Draw the original image onto the context
+            image.draw(at: CGPoint.zero)
+
+            guard let context = UIGraphicsGetCurrentContext() else {
+                return
+            }
+            var index = 0
+            while true {
+                // Create a CGRect object to represent the rectangle
+                let object = objects![index]
+                let x = Int(object.x)
+                let y = Int(object.y)
+                let w = Int(object.w)
+                let h = Int(object.h)
+                let last = object.last
+                let rectangle = CGRect(x: x, y: y, width: w, height: h)
+
+                // Set the fill color of the rectangle
+                UIColor.red.setStroke()
+
+                // Set the line width of the rectangle border
+                context.setLineWidth(4)
+
+                // Draw the rectangle border
+                context.stroke(rectangle)
+
+                // Set up the text attributes
+                let paragraphStyle = NSMutableParagraphStyle()
+                paragraphStyle.alignment = .center
+                let textAttributes = [
+                    NSAttributedString.Key.font: UIFont.systemFont(ofSize: 32),
+                    NSAttributedString.Key.foregroundColor: UIColor.white,
+                    NSAttributedString.Key.paragraphStyle: paragraphStyle,
+                ]
+
+                // Draw the text on the image
+                let textRect = CGRect(x: x, y: y, width: 128, height: 64)
+                let label = yolov5NcnnClassName(object.label)
+                if label != nil {
+                    let text = String(cString: label!)
+                    text.draw(in: textRect, withAttributes: textAttributes)
+                }
+                if last {
+                    break
+                }
+                index += 1
+            }
+
+            // Get the image from the context
+            image = UIGraphicsGetImageFromCurrentImageContext()!
+
+            // End the image context
+            UIGraphicsEndImageContext()
         }
         DispatchQueue.main.async {
             self.imageView.image = image

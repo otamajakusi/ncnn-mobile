@@ -12,6 +12,8 @@ static ncnn::UnlockedPoolAllocator g_blob_pool_allocator;
 static ncnn::PoolAllocator g_workspace_pool_allocator;
 ncnn::Net yolov5;
 
+typedef Yolov5NcnnObject Object;
+
 const int target_size = 640;
 const float prob_threshold = 0.25f;
 const float nms_threshold = 0.45f;
@@ -285,8 +287,8 @@ bool yolov5NcnnInit(const char* param, const char* bin) {
   return true;
 }
 
-Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width, uint32_t height,
-                         bool use_gpu) {
+const Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width,
+                               uint32_t height, bool use_gpu) {
   if (use_gpu == true && ncnn::get_gpu_count() == 0) {
     return NULL;
   }
@@ -427,4 +429,11 @@ Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width, uint32_t height,
   }
 
   return objects;
+}
+
+const char* yolov5NcnnClassName(uint32_t index) {
+  if (index >= sizeof(class_names)) {
+    return NULL;
+  }
+  return class_names[index];
 }
