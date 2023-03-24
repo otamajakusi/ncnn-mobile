@@ -97,7 +97,7 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
                 let rectangle = CGRect(x: x, y: y, width: w, height: h)
 
                 // Set the fill color of the rectangle
-                UIColor.red.setStroke()
+                UIColor.cyan.setStroke()
 
                 // Set the line width of the rectangle border
                 context.setLineWidth(4)
@@ -107,18 +107,26 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
 
                 // Set up the text attributes
                 let paragraphStyle = NSMutableParagraphStyle()
-                paragraphStyle.alignment = .center
+                let font = UIFont.systemFont(ofSize: 32)
+                paragraphStyle.alignment = .left
                 let textAttributes = [
-                    NSAttributedString.Key.font: UIFont.systemFont(ofSize: 32),
-                    NSAttributedString.Key.foregroundColor: UIColor.white,
+                    NSAttributedString.Key.font: font,
+                    NSAttributedString.Key.foregroundColor: UIColor.black,
                     NSAttributedString.Key.paragraphStyle: paragraphStyle,
                 ]
 
                 // Draw the text on the image
-                let textRect = CGRect(x: x, y: y, width: 128, height: 64)
+                let textPoint = CGPoint(x:x, y:y)
+                let textSize = CGSize(width: 128, height: 64)
+                let textRect = CGRect(origin: textPoint, size: textSize)
+
                 let label = yolov5NcnnClassName(object.label)
-                if label != nil {
-                    let text = String(cString: label!)
+                if let label = label {
+                    let text = String(cString: label)
+                    let textSize = text.size(with: font)
+                    let rectangle = CGRect(x: x, y: y, width: Int(textSize.width), height: Int(textSize.height))
+                    UIColor.white.setFill()
+                    context.fill(rectangle)
                     text.draw(in: textRect, withAttributes: textAttributes)
                 }
                 if last {
@@ -151,5 +159,12 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
         CFDataGetBytes(data, CFRange(location: 0, length: length), &rawData)
 
         return rawData
+    }
+}
+
+extension String {
+    func size(with font: UIFont) -> CGSize {
+        let attributes = [NSAttributedString.Key.font : font]
+        return (self as NSString).size(withAttributes: attributes)
     }
 }
