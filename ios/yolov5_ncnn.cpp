@@ -15,7 +15,7 @@ ncnn::Net yolov5;
 typedef Yolov5NcnnObject Object;
 
 const int target_size = 640;
-const float prob_threshold = 0.25f;
+const float prob_threshold = 0.50f;
 const float nms_threshold = 0.45f;
 const float norm_vals[3] = {1 / 255.f, 1 / 255.f, 1 / 255.f};
 
