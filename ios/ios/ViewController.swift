@@ -63,7 +63,6 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
         _ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer,
         from connection: AVCaptureConnection
     ) {
-
         guard let imgBuf = CMSampleBufferGetImageBuffer(sampleBuffer) else { return }
         let ciImg = CIImage(cvPixelBuffer: imgBuf)
 
