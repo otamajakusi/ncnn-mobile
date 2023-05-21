@@ -7,8 +7,22 @@ find_package(ncnn REQUIRED)
 
 add_library(yolov5ncnn SHARED yolov5ncnn_jni.cpp)
 
+include_directories(eigen)
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++17")
+include_directories(ByteTrack-cpp/include)
+add_library(bytetrack
+    SHARED
+    ByteTrack-cpp/src/BYTETracker.cpp
+    ByteTrack-cpp/src/KalmanFilter.cpp
+    ByteTrack-cpp/src/Object.cpp
+    ByteTrack-cpp/src/Rect.cpp
+    ByteTrack-cpp/src/STrack.cpp
+    ByteTrack-cpp/src/lapjv.cpp)
+
 target_link_libraries(yolov5ncnn
     ncnn
+    bytetrack
 
     jnigraphics
 )

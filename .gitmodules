@@ -1,0 +1,6 @@
+[submodule "android/app/src/main/jni/ByteTrack-cpp"]
+	path = android/app/src/main/jni/ByteTrack-cpp
+	url = https://github.com/Vertical-Beach/ByteTrack-cpp.git
+[submodule "android/app/src/main/jni/eigen"]
+	path = android/app/src/main/jni/eigen
+	url = https://gitlab.com/libeigen/eigen
