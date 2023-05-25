@@ -31,7 +31,19 @@ public class YoloV5Ncnn
         public float prob;
     }
 
+    public class STrack
+    {
+        public float x;
+        public float y;
+        public float w;
+        public float h;
+        public long trackId;
+        public long frameId;
+        public float score;
+    }
+
     public native Obj[] Detect(Bitmap bitmap, boolean use_gpu);
+    public native STrack[] DetectSTrack(Bitmap bitmap, boolean use_gpu);
 
     static {
         System.loadLibrary("yolov5ncnn");

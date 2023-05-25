@@ -20,16 +20,20 @@
 
 #include <string>
 #include <vector>
+#include <optional>
 
 // ncnn
 #include "layer.h"
 #include "net.h"
 #include "benchmark.h"
 
+#include "ByteTrack/BYTETracker.h"
+
 static ncnn::UnlockedPoolAllocator g_blob_pool_allocator;
 static ncnn::PoolAllocator g_workspace_pool_allocator;
 
 static ncnn::Net yolov5;
+static byte_track::BYTETracker tracker;
 
 class YoloV5Focus : public ncnn::Layer
 {
@@ -276,107 +280,19 @@ static void generate_proposals(const ncnn::Mat& anchors, int stride, const ncnn:
     }
 }
 
-extern "C" {
-
-// FIXME DeleteGlobalRef is missing for objCls
-static jclass objCls = NULL;
-static jmethodID constructortorId;
-static jfieldID xId;
-static jfieldID yId;
-static jfieldID wId;
-static jfieldID hId;
-static jfieldID labelId;
-static jfieldID probId;
-
-JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
+static std::optional<std::vector<Object>> detect(JNIEnv* env, jobject bitmap, bool use_gpu)
 {
-    __android_log_print(ANDROID_LOG_DEBUG, "YoloV5Ncnn", "JNI_OnLoad");
-
-    ncnn::create_gpu_instance();
-
-    return JNI_VERSION_1_4;
-}
-
-JNIEXPORT void JNI_OnUnload(JavaVM* vm, void* reserved)
-{
-    __android_log_print(ANDROID_LOG_DEBUG, "YoloV5Ncnn", "JNI_OnUnload");
-
-    ncnn::destroy_gpu_instance();
-}
-
-// public native boolean Init(AssetManager mgr);
-JNIEXPORT jboolean JNICALL Java_com_tencent_yolov5ncnn_YoloV5Ncnn_Init(JNIEnv* env, jobject thiz, jobject assetManager)
-{
-    ncnn::Option opt;
-    opt.lightmode = true;
-    opt.num_threads = 4;
-    opt.blob_allocator = &g_blob_pool_allocator;
-    opt.workspace_allocator = &g_workspace_pool_allocator;
-    opt.use_packing_layout = true;
-
-    // use vulkan compute
-    if (ncnn::get_gpu_count() != 0)
-        opt.use_vulkan_compute = true;
-
-    AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
-
-    yolov5.opt = opt;
-
-    yolov5.register_custom_layer("YoloV5Focus", YoloV5Focus_layer_creator);
-
-    // init param
+    if (use_gpu == true && ncnn::get_gpu_count() == 0)
     {
-        int ret = yolov5.load_param(mgr, "yolov5s.param");
-        if (ret != 0)
-        {
-            __android_log_print(ANDROID_LOG_DEBUG, "YoloV5Ncnn", "load_param failed");
-            return JNI_FALSE;
-        }
+        return std::nullopt;
     }
-
-    // init bin
-    {
-        int ret = yolov5.load_model(mgr, "yolov5s.bin");
-        if (ret != 0)
-        {
-            __android_log_print(ANDROID_LOG_DEBUG, "YoloV5Ncnn", "load_model failed");
-            return JNI_FALSE;
-        }
-    }
-
-    // init jni glue
-    jclass localObjCls = env->FindClass("com/tencent/yolov5ncnn/YoloV5Ncnn$Obj");
-    objCls = reinterpret_cast<jclass>(env->NewGlobalRef(localObjCls));
-
-    constructortorId = env->GetMethodID(objCls, "<init>", "(Lcom/tencent/yolov5ncnn/YoloV5Ncnn;)V");
-
-    xId = env->GetFieldID(objCls, "x", "F");
-    yId = env->GetFieldID(objCls, "y", "F");
-    wId = env->GetFieldID(objCls, "w", "F");
-    hId = env->GetFieldID(objCls, "h", "F");
-    labelId = env->GetFieldID(objCls, "label", "Ljava/lang/String;");
-    probId = env->GetFieldID(objCls, "prob", "F");
-
-    return JNI_TRUE;
-}
-
-// public native Obj[] Detect(Bitmap bitmap, boolean use_gpu);
-JNIEXPORT jobjectArray JNICALL Java_com_tencent_yolov5ncnn_YoloV5Ncnn_Detect(JNIEnv* env, jobject thiz, jobject bitmap, jboolean use_gpu)
-{
-    if (use_gpu == JNI_TRUE && ncnn::get_gpu_count() == 0)
-    {
-        return NULL;
-        //return env->NewStringUTF("no vulkan capable gpu");
-    }
-
-    double start_time = ncnn::get_current_time();
 
     AndroidBitmapInfo info;
     AndroidBitmap_getInfo(env, bitmap, &info);
     const int width = info.width;
     const int height = info.height;
     if (info.format != ANDROID_BITMAP_FORMAT_RGBA_8888)
-        return NULL;
+        return std::nullopt;
 
     // ncnn from bitmap
     const int target_size = 640;
@@ -515,6 +431,131 @@ JNIEXPORT jobjectArray JNICALL Java_com_tencent_yolov5ncnn_YoloV5Ncnn_Detect(JNI
             objects[i].h = y1 - y0;
         }
     }
+    return objects;
+}
+
+extern "C" {
+
+// FIXME DeleteGlobalRef is missing for objCls
+static jclass objCls = NULL;
+static jclass strackCls = NULL;
+static jmethodID constructortorId;
+static jfieldID o_xId;
+static jfieldID o_yId;
+static jfieldID o_wId;
+static jfieldID o_hId;
+static jfieldID o_labelId;
+static jfieldID o_probId;
+
+static jfieldID s_xId;
+static jfieldID s_yId;
+static jfieldID s_wId;
+static jfieldID s_hId;
+static jfieldID s_trackId;
+static jfieldID s_frameId;
+static jfieldID s_score;
+
+
+JNIEXPORT jint JNI_OnLoad(JavaVM* vm, void* reserved)
+{
+    __android_log_print(ANDROID_LOG_DEBUG, "YoloV5Ncnn", "JNI_OnLoad");
+
+    ncnn::create_gpu_instance();
+
+    return JNI_VERSION_1_4;
+}
+
+JNIEXPORT void JNI_OnUnload(JavaVM* vm, void* reserved)
+{
+    __android_log_print(ANDROID_LOG_DEBUG, "YoloV5Ncnn", "JNI_OnUnload");
+
+    ncnn::destroy_gpu_instance();
+}
+
+// public native boolean Init(AssetManager mgr);
+JNIEXPORT jboolean JNICALL Java_com_tencent_yolov5ncnn_YoloV5Ncnn_Init(JNIEnv* env, jobject thiz, jobject assetManager)
+{
+    ncnn::Option opt;
+    opt.lightmode = true;
+    opt.num_threads = 4;
+    opt.blob_allocator = &g_blob_pool_allocator;
+    opt.workspace_allocator = &g_workspace_pool_allocator;
+    opt.use_packing_layout = true;
+
+    // use vulkan compute
+    if (ncnn::get_gpu_count() != 0)
+        opt.use_vulkan_compute = true;
+
+    AAssetManager* mgr = AAssetManager_fromJava(env, assetManager);
+
+    yolov5.opt = opt;
+
+    yolov5.register_custom_layer("YoloV5Focus", YoloV5Focus_layer_creator);
+
+    // init param
+    {
+        int ret = yolov5.load_param(mgr, "yolov5s.param");
+        if (ret != 0)
+        {
+            __android_log_print(ANDROID_LOG_DEBUG, "YoloV5Ncnn", "load_param failed");
+            return JNI_FALSE;
+        }
+    }
+
+    // init bin
+    {
+        int ret = yolov5.load_model(mgr, "yolov5s.bin");
+        if (ret != 0)
+        {
+            __android_log_print(ANDROID_LOG_DEBUG, "YoloV5Ncnn", "load_model failed");
+            return JNI_FALSE;
+        }
+    }
+
+    // init jni glue
+    jclass localObjCls = env->FindClass("com/tencent/yolov5ncnn/YoloV5Ncnn$Obj");
+    objCls = reinterpret_cast<jclass>(env->NewGlobalRef(localObjCls));
+
+    jclass localSTrackCls = env->FindClass("com/tencent/yolov5ncnn/YoloV5Ncnn$STrack");
+    strackCls = reinterpret_cast<jclass>(env->NewGlobalRef(localSTrackCls));
+
+    constructortorId = env->GetMethodID(objCls, "<init>", "(Lcom/tencent/yolov5ncnn/YoloV5Ncnn;)V");
+
+    o_xId = env->GetFieldID(objCls, "x", "F");
+    o_yId = env->GetFieldID(objCls, "y", "F");
+    o_wId = env->GetFieldID(objCls, "w", "F");
+    o_hId = env->GetFieldID(objCls, "h", "F");
+    o_labelId = env->GetFieldID(objCls, "label", "Ljava/lang/String;");
+    o_probId = env->GetFieldID(objCls, "prob", "F");
+
+    s_xId = env->GetFieldID(strackCls, "x", "F");
+    s_yId = env->GetFieldID(strackCls, "y", "F");
+    s_wId = env->GetFieldID(strackCls, "w", "F");
+    s_hId = env->GetFieldID(strackCls, "h", "F");
+    s_trackId = env->GetFieldID(strackCls, "trackId", "J");
+    s_frameId = env->GetFieldID(strackCls, "frameId", "J");
+    s_score = env->GetFieldID(strackCls, "score", "F");
+
+    return JNI_TRUE;
+}
+
+// public native Obj[] Detect(Bitmap bitmap, boolean use_gpu);
+JNIEXPORT jobjectArray JNICALL Java_com_tencent_yolov5ncnn_YoloV5Ncnn_Detect(JNIEnv* env, jobject thiz, jobject bitmap, jboolean use_gpu)
+{
+    double start_time = ncnn::get_current_time();
+
+    auto ret = detect(env, bitmap, use_gpu == JNI_TRUE);
+    if (!ret.has_value()) {
+        return NULL;
+    }
+    auto objects = ret.value();
+
+    std::vector<byte_track::Object> btobjs;
+    for (auto obj : objects) {
+        const byte_track::Rect<float> btrect(obj.x, obj.y, obj.w, obj.h);
+        btobjs.push_back(byte_track::Object(btrect, obj.label, obj.prob));
+    }
+    const auto strack = tracker.update(btobjs);
 
     // objects to Obj[]
     static const char* class_names[] = {
@@ -535,14 +576,57 @@ JNIEXPORT jobjectArray JNICALL Java_com_tencent_yolov5ncnn_YoloV5Ncnn_Detect(JNI
     {
         jobject jObj = env->NewObject(objCls, constructortorId, thiz);
 
-        env->SetFloatField(jObj, xId, objects[i].x);
-        env->SetFloatField(jObj, yId, objects[i].y);
-        env->SetFloatField(jObj, wId, objects[i].w);
-        env->SetFloatField(jObj, hId, objects[i].h);
-        env->SetObjectField(jObj, labelId, env->NewStringUTF(class_names[objects[i].label]));
-        env->SetFloatField(jObj, probId, objects[i].prob);
+        env->SetFloatField(jObj, o_xId, objects[i].x);
+        env->SetFloatField(jObj, o_yId, objects[i].y);
+        env->SetFloatField(jObj, o_wId, objects[i].w);
+        env->SetFloatField(jObj, o_hId, objects[i].h);
+        env->SetObjectField(jObj, o_labelId, env->NewStringUTF(class_names[objects[i].label]));
+        env->SetFloatField(jObj, o_probId, objects[i].prob);
 
         env->SetObjectArrayElement(jObjArray, i, jObj);
+    }
+    
+    double elasped = ncnn::get_current_time() - start_time;
+    __android_log_print(ANDROID_LOG_DEBUG, "YoloV5Ncnn", "%.2fms   detect", elasped);
+
+    return jObjArray;
+}
+
+// public native STrack[] DetectSTrack(Bitmap bitmap, boolean use_gpu);
+JNIEXPORT jobjectArray JNICALL Java_com_tencent_yolov5ncnn_YoloV5Ncnn_DetectSTrack(JNIEnv* env, jobject thiz, jobject bitmap, jboolean use_gpu)
+{
+    double start_time = ncnn::get_current_time();
+
+    auto ret = detect(env, bitmap, use_gpu == JNI_TRUE);
+    if (!ret.has_value()) {
+        return NULL;
+    }
+    auto objects = ret.value();
+
+    std::vector<byte_track::Object> btobjs;
+    for (auto obj : objects) {
+        const byte_track::Rect<float> btrect(obj.x, obj.y, obj.w, obj.h);
+        btobjs.push_back(byte_track::Object(btrect, obj.label, obj.prob));
+    }
+    const auto stracks = tracker.update(btobjs);
+
+    jobjectArray jObjArray = env->NewObjectArray(stracks.size(), strackCls, NULL);
+
+    size_t i = 0;
+    for (auto st : stracks) {
+        const auto& rect = st->getRect();
+        jobject jObj = env->NewObject(strackCls, constructortorId, thiz);
+
+        env->SetFloatField(jObj, s_xId, rect.x());
+        env->SetFloatField(jObj, s_yId, rect.y());
+        env->SetFloatField(jObj, s_wId, rect.width());
+        env->SetFloatField(jObj, s_hId, rect.height());
+        env->SetLongField(jObj, s_trackId, st->getTrackId());
+        env->SetLongField(jObj, s_frameId, st->getFrameId());
+        env->SetFloatField(jObj, s_score, st->getScore());
+
+        env->SetObjectArrayElement(jObjArray, i, jObj);
+        ++ i;
     }
 
     double elasped = ncnn::get_current_time() - start_time;
