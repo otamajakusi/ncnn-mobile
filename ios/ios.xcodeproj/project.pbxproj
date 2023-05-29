@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3CC9500B2A24EE2200BFDEF5 /* STrack.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CC950052A24EE2200BFDEF5 /* STrack.cpp */; };
+		3CC9500C2A24EE2300BFDEF5 /* Object.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CC950062A24EE2200BFDEF5 /* Object.cpp */; };
+		3CC9500D2A24EE2300BFDEF5 /* BYTETracker.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CC950072A24EE2200BFDEF5 /* BYTETracker.cpp */; };
+		3CC9500E2A24EE2300BFDEF5 /* lapjv.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CC950082A24EE2200BFDEF5 /* lapjv.cpp */; };
+		3CC9500F2A24EE2300BFDEF5 /* KalmanFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CC950092A24EE2200BFDEF5 /* KalmanFilter.cpp */; };
+		3CC950102A24EE2300BFDEF5 /* Rect.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3CC9500A2A24EE2200BFDEF5 /* Rect.cpp */; };
 		3CD8E61429C97D5600EB3EB6 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CD8E61329C97D5600EB3EB6 /* AppDelegate.swift */; };
 		3CD8E61629C97D5600EB3EB6 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CD8E61529C97D5600EB3EB6 /* SceneDelegate.swift */; };
 		3CD8E61829C97D5600EB3EB6 /* ViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CD8E61729C97D5600EB3EB6 /* ViewController.swift */; };
@@ -41,6 +47,12 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		3CC950052A24EE2200BFDEF5 /* STrack.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = STrack.cpp; path = "ByteTrack-cpp/src/STrack.cpp"; sourceTree = "<group>"; };
+		3CC950062A24EE2200BFDEF5 /* Object.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Object.cpp; path = "ByteTrack-cpp/src/Object.cpp"; sourceTree = "<group>"; };
+		3CC950072A24EE2200BFDEF5 /* BYTETracker.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = BYTETracker.cpp; path = "ByteTrack-cpp/src/BYTETracker.cpp"; sourceTree = "<group>"; };
+		3CC950082A24EE2200BFDEF5 /* lapjv.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = lapjv.cpp; path = "ByteTrack-cpp/src/lapjv.cpp"; sourceTree = "<group>"; };
+		3CC950092A24EE2200BFDEF5 /* KalmanFilter.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = KalmanFilter.cpp; path = "ByteTrack-cpp/src/KalmanFilter.cpp"; sourceTree = "<group>"; };
+		3CC9500A2A24EE2200BFDEF5 /* Rect.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = Rect.cpp; path = "ByteTrack-cpp/src/Rect.cpp"; sourceTree = "<group>"; };
 		3CD8E61029C97D5600EB3EB6 /* ios.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ios.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3CD8E61329C97D5600EB3EB6 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		3CD8E61529C97D5600EB3EB6 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
@@ -73,9 +85,23 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3CC950042A24EDD200BFDEF5 /* ByteTrack-cpp */ = {
+			isa = PBXGroup;
+			children = (
+				3CC950072A24EE2200BFDEF5 /* BYTETracker.cpp */,
+				3CC950092A24EE2200BFDEF5 /* KalmanFilter.cpp */,
+				3CC950082A24EE2200BFDEF5 /* lapjv.cpp */,
+				3CC950062A24EE2200BFDEF5 /* Object.cpp */,
+				3CC9500A2A24EE2200BFDEF5 /* Rect.cpp */,
+				3CC950052A24EE2200BFDEF5 /* STrack.cpp */,
+			);
+			name = "ByteTrack-cpp";
+			sourceTree = "<group>";
+		};
 		3CD8E60729C97D5600EB3EB6 = {
 			isa = PBXGroup;
 			children = (
+				3CC950042A24EDD200BFDEF5 /* ByteTrack-cpp */,
 				3CD8E63A29C9EC6A00EB3EB6 /* yolov5s.bin */,
 				3CD8E63929C9EC6900EB3EB6 /* yolov5s.param */,
 				3CD8E63629C9844F00EB3EB6 /* yolov5_ncnn.cpp */,
@@ -194,10 +220,16 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3CC9500B2A24EE2200BFDEF5 /* STrack.cpp in Sources */,
 				3CD8E61829C97D5600EB3EB6 /* ViewController.swift in Sources */,
+				3CC9500F2A24EE2300BFDEF5 /* KalmanFilter.cpp in Sources */,
+				3CC9500D2A24EE2300BFDEF5 /* BYTETracker.cpp in Sources */,
+				3CC9500C2A24EE2300BFDEF5 /* Object.cpp in Sources */,
 				3CD8E61429C97D5600EB3EB6 /* AppDelegate.swift in Sources */,
 				3CD8E63829C9845000EB3EB6 /* yolov5_ncnn.cpp in Sources */,
 				3CD8E61629C97D5600EB3EB6 /* SceneDelegate.swift in Sources */,
+				3CC9500E2A24EE2300BFDEF5 /* lapjv.cpp in Sources */,
+				3CC950102A24EE2300BFDEF5 /* Rect.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -14,7 +14,10 @@ static ncnn::UnlockedPoolAllocator g_blob_pool_allocator;
 static ncnn::PoolAllocator g_workspace_pool_allocator;
 ncnn::Net yolov5;
 
+static byte_track::BYTETracker tracker;
+
 typedef Yolov5NcnnObject Object;
+typedef Yolov5NcnnSTrack STrack;
 
 const int target_size = 640;
 const float prob_threshold = 0.50f;
@@ -260,6 +263,7 @@ static void generate_proposals(const ncnn::Mat& anchors, int stride,
 }
 
 static Object* g_objects = NULL;
+static STrack* g_stracks = NULL;
 
 bool yolov5NcnnInit(const char* param, const char* bin) {
   ncnn::Option opt;
@@ -431,6 +435,44 @@ const Object* yolov5NcnnDetect(const uint8_t* pixel, uint32_t width,
   }
 
   return objects;
+}
+
+const Yolov5NcnnSTrack* yolov5NcnnDetectSTrack(const Yolov5NcnnObject* objects) {
+  const Yolov5NcnnObject* obj = objects;
+  std::vector<byte_track::Object> btobjs;
+  while (1) {
+    const byte_track::Rect<float> btrect(obj->x, obj->y, obj->w, obj->h);
+    btobjs.push_back(byte_track::Object(btrect, obj->label, obj->prob));
+    if (obj->last) {
+      break;
+    }
+    obj ++;
+  }
+  const auto stracks = tracker.update(btobjs);
+  if (g_stracks) {
+    free(g_stracks);
+  }
+  g_stracks = (STrack*)malloc(sizeof(STrack) * stracks.size());
+  auto pst = g_stracks;
+
+  for (size_t i = 0; i < stracks.size(); i ++) {
+    const auto& st = stracks[i];
+    const auto& rect = st->getRect();
+    pst->x = rect.x();
+    pst->y = rect.y();
+    pst->w = rect.width();
+    pst->h = rect.height();
+    pst->trackId = st->getTrackId();
+    pst->frameId = st->getFrameId();
+    pst->score = st->getScore();
+    if (i == stracks.size()) {
+      pst->last = true;
+    } else {	
+      pst->last = false;
+    }
+    pst ++;
+  }
+  return g_stracks;
 }
 
 const char* yolov5NcnnClassName(uint32_t index) {

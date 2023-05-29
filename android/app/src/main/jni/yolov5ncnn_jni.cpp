@@ -555,7 +555,6 @@ JNIEXPORT jobjectArray JNICALL Java_com_tencent_yolov5ncnn_YoloV5Ncnn_Detect(JNI
         const byte_track::Rect<float> btrect(obj.x, obj.y, obj.w, obj.h);
         btobjs.push_back(byte_track::Object(btrect, obj.label, obj.prob));
     }
-    const auto strack = tracker.update(btobjs);
 
     // objects to Obj[]
     static const char* class_names[] = {
