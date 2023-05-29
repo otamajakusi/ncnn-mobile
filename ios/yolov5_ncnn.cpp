@@ -8,6 +8,8 @@
 #include "layer.h"
 #include "net.h"
 
+#include "ByteTrack/BYTETracker.h"
+
 static ncnn::UnlockedPoolAllocator g_blob_pool_allocator;
 static ncnn::PoolAllocator g_workspace_pool_allocator;
 ncnn::Net yolov5;

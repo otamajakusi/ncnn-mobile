@@ -4,3 +4,9 @@
 [submodule "android/app/src/main/jni/eigen"]
 	path = android/app/src/main/jni/eigen
 	url = https://gitlab.com/libeigen/eigen
+[submodule "ios/eigen"]
+	path = ios/eigen
+	url = https://gitlab.com/libeigen/eigen
+[submodule "ios/ByteTrack-cpp"]
+	path = ios/ByteTrack-cpp
+	url = https://github.com/Vertical-Beach/ByteTrack-cpp.git

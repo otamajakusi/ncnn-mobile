@@ -352,7 +352,11 @@
 				);
 				GCC_ENABLE_CPP_RTTI = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = ncnn.framework/Headers/ncnn;
+				HEADER_SEARCH_PATHS = (
+					ncnn.framework/Headers/ncnn,
+					"ByteTrack-cpp/include/",
+					eigen,
+				);
 				INFOPLIST_FILE = ios/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "To be able to take video stream.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -392,7 +396,11 @@
 				);
 				GCC_ENABLE_CPP_RTTI = NO;
 				GENERATE_INFOPLIST_FILE = YES;
-				HEADER_SEARCH_PATHS = ncnn.framework/Headers/ncnn;
+				HEADER_SEARCH_PATHS = (
+					ncnn.framework/Headers/ncnn,
+					"ByteTrack-cpp/include/",
+					eigen,
+				);
 				INFOPLIST_FILE = ios/Info.plist;
 				INFOPLIST_KEY_NSCameraUsageDescription = "To be able to take video stream.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
