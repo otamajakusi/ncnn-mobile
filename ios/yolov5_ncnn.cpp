@@ -449,6 +449,10 @@ const Yolov5NcnnSTrack* yolov5NcnnDetectSTrack(const Yolov5NcnnObject* objects) 
     obj ++;
   }
   const auto stracks = tracker.update(btobjs);
+
+  if (stracks.size() == 0) {
+      return NULL;
+  }
   if (g_stracks) {
     free(g_stracks);
   }
@@ -465,11 +469,7 @@ const Yolov5NcnnSTrack* yolov5NcnnDetectSTrack(const Yolov5NcnnObject* objects) 
     pst->trackId = st->getTrackId();
     pst->frameId = st->getFrameId();
     pst->score = st->getScore();
-    if (i == stracks.size()) {
-      pst->last = true;
-    } else {	
-      pst->last = false;
-    }
+    pst->last = i + 1 == stracks.size();
     pst ++;
   }
   return g_stracks;

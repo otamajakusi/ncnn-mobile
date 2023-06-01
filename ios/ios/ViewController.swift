@@ -11,6 +11,7 @@ import UIKit
 class ViewController: UIViewController {
 
     @IBOutlet weak var imageView: UIImageView!
+    var tracking = false
 
     let captureSession = AVCaptureSession()
 
@@ -44,6 +45,10 @@ class ViewController: UIViewController {
 
         captureSession.commitConfiguration()
 
+        let longPressRecognizer = UILongPressGestureRecognizer(target: self, action: #selector(longPressHandler))
+
+        self.view.addGestureRecognizer(longPressRecognizer)
+
         guard let binFile = Bundle.main.path(forResource: "yolov5s", ofType: "bin") else { return }
         guard let paramFile = Bundle.main.path(forResource: "yolov5s", ofType: "param") else {
             return
@@ -54,6 +59,17 @@ class ViewController: UIViewController {
 
         DispatchQueue.global(qos: .userInitiated).async {
             self.captureSession.startRunning()
+        }
+    }
+
+    @objc func longPressHandler(gesture: UILongPressGestureRecognizer) {
+        if gesture.state == .began {
+            print("tracking \(tracking)")
+            if tracking {
+                tracking = false
+            } else {
+                tracking = true
+            }
         }
     }
 }
@@ -85,6 +101,11 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
                     rawData, imgWidth, imgHeight, true)
             else { return }
 
+            var stracks: UnsafePointer<Yolov5NcnnSTrack>? = nil
+            if tracking {
+                stracks = yolov5NcnnDetectSTrack(objects)
+            }
+
             let font = UIFont.systemFont(ofSize: 32)
             let paragraphStyle = NSMutableParagraphStyle()
             paragraphStyle.alignment = .left
@@ -96,15 +117,32 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
 
             var index = 0
             while true {
-                let object = objects[index]
-                drawObject(
-                    object: object,
-                    context: context.cgContext,
-                    font: font,
-                    textAttributes: textAttributes
-                )
-                if object.last {
-                    break
+                if tracking {
+                    if let stracks = stracks {
+                        let strack = stracks[index]
+                        drawSTrack(
+                            strack: strack,
+                            context: context.cgContext,
+                            font: font,
+                            textAttributes: textAttributes
+                        )
+                        if strack.last {
+                            break
+                        }
+                    } else {
+                        break
+                    }
+                } else {
+                    let object = objects[index]
+                    drawObject(
+                        object: object,
+                        context: context.cgContext,
+                        font: font,
+                        textAttributes: textAttributes
+                    )
+                    if object.last {
+                        break
+                    }
                 }
                 index += 1
             }
@@ -155,6 +193,30 @@ extension ViewController: AVCaptureVideoDataOutputSampleBufferDelegate {
             context.fill(labelBox)
             label.draw(in: labelBox, withAttributes: textAttributes)
         }
+    }
+
+    func drawSTrack(
+        strack: Yolov5NcnnSTrack, context: CGContext, font: UIFont,
+        textAttributes: [NSAttributedString.Key: NSObject]
+    ) {
+        // bbox
+        let x = Int(strack.x)
+        let y = Int(strack.y)
+        let w = Int(strack.w)
+        let h = Int(strack.h)
+        let bbox = CGRect(x: x, y: y, width: w, height: h)
+        UIColor.cyan.setStroke()
+        context.setLineWidth(4)
+        context.stroke(bbox)
+
+        // label
+        let label = String(strack.trackId)
+        let labelSize = label.size(with: font)
+        let labelBox = CGRect(
+            x: x, y: y, width: Int(labelSize.width + 8), height: Int(labelSize.height))
+        UIColor.white.setFill()
+        context.fill(labelBox)
+        label.draw(in: labelBox, withAttributes: textAttributes)
     }
 }
 
